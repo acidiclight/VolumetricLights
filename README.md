@@ -1,3 +1,6 @@
+# Volumetric Lights for Unity Built-in RP
+Forked from https://github.com/SlightlyMad/VolumetricLights to upgrade it to a more recent Unity version. The original README is below.
+
 # Volumetric Lights for Unity 5
 [![IMAGE ALT TEXT HERE](https://bqu2ya.dm1.livefilestore.com/y4mSxIn4D7Zx9td_2NWn3yZu8UxWeqJKN4qdciZ0fCqO9ox290xR837Moux6HnPpWPkF8mi7oY26ZNF7n0eJfbPMNoBTtrMraKnghJ4XF13tCK2bBPybZVudlL1UU_gBkFyY7lt30UYbVJ-EZVaV2Z8C1DglijmBYelQfJyplssFe7oSklBvneGtDlhwDv1dougv2ZpHmipfzYRuR6fLeawlQ?width=1167&height=653&cropmode=none)](https://www.youtube.com/watch?v=JPxLCYXB-8A) [![IMAGE ALT TEXT HERE](https://agu0ya-dm2305.files.1drv.com/y4mnqQ4pzhZdF4k3Z7Fv_QApimv9POLR1ShQPoNg8wtUf7TzqFdWLY6Y8bxtyJhGQNRe8NLvy1GGoZsorNssr2h6fTsAfyi-F2LOIA4wzNY_7cS-1iEjVHyOCyOCTA0_8na3cmWvQ34gHBfyXOxxE6AZIjaVwCemZP7kSwaUNoNDyCPsCkx8vsdmxuwmuVcrH1rYblmFCaVH5za_EsrqM-qJA?width=1167&height=650&cropmode=none)](https://www.youtube.com/watch?v=ElaPJyzR504)
 
