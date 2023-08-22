@@ -1,0 +1,7 @@
+{
+    "name": "dev.acidiclight.volumetric-lights",
+    "version": "1.0.0",
+    "description": "Volumetric lighting system for Unity legacy built-in RP. This is a fork of https://github.com/SlightlyMad/VolumetricLights, which was made for Unity 5.",
+    "author": "acidic light, SlightlyMad",
+    "displayName": "Volumetric Lights for Legacy RP"
+}
