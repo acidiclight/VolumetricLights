@@ -31,6 +31,7 @@ using UnityEngine;
 using System.Collections;
 using UnityEngine.Rendering;
 using System;
+using UnityEngine.Serialization;
 
 namespace VolumetricLights
 {
@@ -39,97 +40,105 @@ namespace VolumetricLights
     {
         public event Action<VolumetricLightRenderer, VolumetricLight, CommandBuffer, Matrix4x4> CustomRenderEvent;
 
-        private Light _light;
-        private Material _material;
-        private CommandBuffer _commandBuffer;
-        private CommandBuffer _cascadeShadowCommandBuffer;
+        private Light light;
+        private Material material;
+        private CommandBuffer commandBuffer;
+        private CommandBuffer cascadeShadowCommandBuffer;
 
+        [FormerlySerializedAs("SampleCount")]
         [Range(1, 64)]
-        public int SampleCount = 8;
+        public int sampleCount = 8;
 
+        [FormerlySerializedAs("ScatteringCoef")]
         [Range(0.0f, 1.0f)]
-        public float ScatteringCoef = 0.5f;
+        public float scatteringCoef = 0.5f;
 
+        [FormerlySerializedAs("ExtinctionCoef")]
         [Range(0.0f, 0.1f)]
-        public float ExtinctionCoef = 0.01f;
+        public float extinctionCoef = 0.01f;
 
+        [FormerlySerializedAs("SkyboxExtinctionCoef")]
         [Range(0.0f, 1.0f)]
-        public float SkyboxExtinctionCoef = 0.9f;
+        public float skyboxExtinctionCoef = 0.9f;
 
+        [FormerlySerializedAs("MieG")]
         [Range(0.0f, 0.999f)]
-        public float MieG = 0.1f;
+        public float mieG = 0.1f;
 
-        public bool HeightFog = false;
+        [FormerlySerializedAs("HeightFog")]
+        public bool heightFog = false;
 
+        [FormerlySerializedAs("HeightScale")]
         [Range(0, 0.5f)]
-        public float HeightScale = 0.10f;
+        public float heightScale = 0.10f;
 
-        public float GroundLevel = 0;
-        public bool Noise = false;
-        public float NoiseScale = 0.015f;
-        public float NoiseIntensity = 1.0f;
-        public float NoiseIntensityOffset = 0.3f;
-        public Vector2 NoiseVelocity = new Vector2(3.0f, 3.0f);
+        [FormerlySerializedAs("GroundLevel")]
+        public float groundLevel = 0;
+        [FormerlySerializedAs("Noise")]
+        public bool noise = false;
+        [FormerlySerializedAs("NoiseScale")]
+        public float noiseScale = 0.015f;
+        [FormerlySerializedAs("NoiseIntensity")]
+        public float noiseIntensity = 1.0f;
+        [FormerlySerializedAs("NoiseIntensityOffset")]
+        public float noiseIntensityOffset = 0.3f;
+        [FormerlySerializedAs("NoiseVelocity")]
+        public Vector2 noiseVelocity = new Vector2(3.0f, 3.0f);
 
+        [FormerlySerializedAs("MaxRayLength")]
         [Tooltip("")]
-        public float MaxRayLength = 400.0f;
+        public float maxRayLength = 400.0f;
 
-        public Light Light
-        {
-            get { return _light; }
-        }
+        public Light Light => light;
 
-        public Material VolumetricMaterial
-        {
-            get { return _material; }
-        }
+        public Material VolumetricMaterial => material;
 
-        private Vector4[] _frustumCorners = new Vector4[4];
+        private bool reversedZ = false;
 
-        private bool _reversedZ = false;
-
+        private readonly Vector4[] frustumCorners = new Vector4[4];
+        
         /// <summary>
         /// 
         /// </summary>
-        void Start()
+        private void Start()
         {
 #if UNITY_5_5_OR_NEWER
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D11 || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D12 ||
                 SystemInfo.graphicsDeviceType == GraphicsDeviceType.Metal || SystemInfo.graphicsDeviceType == GraphicsDeviceType.PlayStation4 ||
                 SystemInfo.graphicsDeviceType == GraphicsDeviceType.Vulkan || SystemInfo.graphicsDeviceType == GraphicsDeviceType.XboxOne)
             {
-                _reversedZ = true;
+                reversedZ = true;
             }
 #endif
 
-            _commandBuffer = new CommandBuffer();
-            _commandBuffer.name = "Light Command Buffer";
+            commandBuffer = new CommandBuffer();
+            commandBuffer.name = "Light Command Buffer";
 
-            _cascadeShadowCommandBuffer = new CommandBuffer();
-            _cascadeShadowCommandBuffer.name = "Dir Light Command Buffer";
-            _cascadeShadowCommandBuffer.SetGlobalTexture("_CascadeShadowMapTexture", new UnityEngine.Rendering.RenderTargetIdentifier(UnityEngine.Rendering.BuiltinRenderTextureType.CurrentActive));
+            cascadeShadowCommandBuffer = new CommandBuffer();
+            cascadeShadowCommandBuffer.name = "Dir Light Command Buffer";
+            cascadeShadowCommandBuffer.SetGlobalTexture("_CascadeShadowMapTexture", new UnityEngine.Rendering.RenderTargetIdentifier(UnityEngine.Rendering.BuiltinRenderTextureType.CurrentActive));
 
-            _light = GetComponent<Light>();
+            light = GetComponent<Light>();
             //_light.RemoveAllCommandBuffers();
-            if (_light.type == LightType.Directional)
+            if (light.type == LightType.Directional)
             {
-                _light.AddCommandBuffer(LightEvent.BeforeScreenspaceMask, _commandBuffer);
-                _light.AddCommandBuffer(LightEvent.AfterShadowMap, _cascadeShadowCommandBuffer);
+                light.AddCommandBuffer(LightEvent.BeforeScreenspaceMask, commandBuffer);
+                light.AddCommandBuffer(LightEvent.AfterShadowMap, cascadeShadowCommandBuffer);
 
             }
             else
-                _light.AddCommandBuffer(LightEvent.AfterShadowMap, _commandBuffer);
+                light.AddCommandBuffer(LightEvent.AfterShadowMap, commandBuffer);
 
             Shader shader = Shader.Find("Sandbox/VolumetricLight");
             if (shader == null)
                 throw new Exception("Critical Error: \"Sandbox/VolumetricLight\" shader is missing. Make sure it is included in \"Always Included Shaders\" in ProjectSettings/Graphics.");
-            _material = new Material(shader); // new Material(VolumetricLightRenderer.GetLightMaterial());
+            material = new Material(shader); // new Material(VolumetricLightRenderer.GetLightMaterial());
         }
 
         /// <summary>
         /// 
         /// </summary>
-        void OnEnable()
+        private void OnEnable()
         {
             VolumetricLightRenderer.PreRenderEvent += VolumetricLightRenderer_PreRenderEvent;
         }
@@ -137,7 +146,7 @@ namespace VolumetricLights
         /// <summary>
         /// 
         /// </summary>
-        void OnDisable()
+        private void OnDisable()
         {
             VolumetricLightRenderer.PreRenderEvent -= VolumetricLightRenderer_PreRenderEvent;
         }
@@ -147,7 +156,7 @@ namespace VolumetricLights
         /// </summary>
         public void OnDestroy()
         {
-            Destroy(_material);
+            Destroy(material);
         }
 
         /// <summary>
@@ -158,23 +167,23 @@ namespace VolumetricLights
         private void VolumetricLightRenderer_PreRenderEvent(VolumetricLightRenderer renderer, Matrix4x4 viewProj)
         {
             // light was destroyed without deregistring, deregister now
-            if (_light == null || _light.gameObject == null)
+            if (light == null || light.gameObject == null)
             {
                 VolumetricLightRenderer.PreRenderEvent -= VolumetricLightRenderer_PreRenderEvent;
             }
 
-            if (!_light.gameObject.activeInHierarchy || _light.enabled == false)
+            if (!light.gameObject.activeInHierarchy || light.enabled == false)
                 return;
 
-            _material.SetVector("_CameraForward", Camera.current.transform.forward);
+            material.SetVector(VolumetricLightingShaderConstants.CameraForward, Camera.current.transform.forward);
 
-            _material.SetInt("_SampleCount", SampleCount);
-            _material.SetVector("_NoiseVelocity", new Vector4(NoiseVelocity.x, NoiseVelocity.y) * NoiseScale);
-            _material.SetVector("_NoiseData", new Vector4(NoiseScale, NoiseIntensity, NoiseIntensityOffset));
-            _material.SetVector("_MieG", new Vector4(1 - (MieG * MieG), 1 + (MieG * MieG), 2 * MieG, 1.0f / (4.0f * Mathf.PI)));
-            _material.SetVector("_VolumetricLight", new Vector4(ScatteringCoef, ExtinctionCoef, _light.range, 1.0f - SkyboxExtinctionCoef));
+            material.SetInt(VolumetricLightingShaderConstants.SampleCount, sampleCount);
+            material.SetVector(VolumetricLightingShaderConstants.NoiseVelocity, new Vector4(noiseVelocity.x, noiseVelocity.y) * noiseScale);
+            material.SetVector(VolumetricLightingShaderConstants.NoiseData, new Vector4(noiseScale, noiseIntensity, noiseIntensityOffset));
+            material.SetVector(VolumetricLightingShaderConstants.MieG, new Vector4(1 - (mieG * mieG), 1 + (mieG * mieG), 2 * mieG, 1.0f / (4.0f * Mathf.PI)));
+            material.SetVector(VolumetricLightingShaderConstants.VolumetricLight, new Vector4(scatteringCoef, extinctionCoef, light.range, 1.0f - skyboxExtinctionCoef));
 
-            _material.SetTexture("_CameraDepthTexture", renderer.GetVolumeLightDepthBuffer());
+            material.SetTexture(VolumetricLightingShaderConstants.CameraDepthTexture, renderer.GetVolumeLightDepthBuffer());
 
             //if (renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
             {
@@ -183,31 +192,31 @@ namespace VolumetricLights
             }
             //else
             {
-                _material.SetFloat("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                material.SetFloat(VolumetricLightingShaderConstants.ZTest, (int)UnityEngine.Rendering.CompareFunction.Always);
                 // downsampled light buffer can't use native zbuffer for ztest, try to perform ztest in pixel shader to avoid ray marching for occulded geometry 
                 //_material.EnableKeyword("MANUAL_ZTEST");
             }
 
-            if (HeightFog)
+            if (heightFog)
             {
-                _material.EnableKeyword("HEIGHT_FOG");
+                material.EnableKeyword("HEIGHT_FOG");
 
-                _material.SetVector("_HeightFog", new Vector4(GroundLevel, HeightScale));
+                material.SetVector(VolumetricLightingShaderConstants.HeightFog, new Vector4(groundLevel, heightScale));
             }
             else
             {
-                _material.DisableKeyword("HEIGHT_FOG");
+                material.DisableKeyword("HEIGHT_FOG");
             }
 
-            if (_light.type == LightType.Point)
+            if (light.type == LightType.Point)
             {
                 SetupPointLight(renderer, viewProj);
             }
-            else if (_light.type == LightType.Spot)
+            else if (light.type == LightType.Spot)
             {
                 SetupSpotLight(renderer, viewProj);
             }
-            else if (_light.type == LightType.Directional)
+            else if (light.type == LightType.Directional)
             {
                 SetupDirectionalLight(renderer, viewProj);
             }
@@ -220,65 +229,63 @@ namespace VolumetricLights
         /// <param name="viewProj"></param>
         private void SetupPointLight(VolumetricLightRenderer renderer, Matrix4x4 viewProj)
         {
-            _commandBuffer.Clear();
+            commandBuffer.Clear();
 
-            int pass = 0;
+            var pass = 0;
             if (!IsCameraInPointLightBounds())
                 pass = 2;
 
-            _material.SetPass(pass);
+            material.SetPass(pass);
 
             Mesh mesh = VolumetricLightRenderer.GetPointLightMesh();
 
-            float scale = _light.range * 2.0f;
-            Matrix4x4 world = Matrix4x4.TRS(transform.position, _light.transform.rotation, new Vector3(scale, scale, scale));
+            float scale = light.range * 2.0f;
+            Matrix4x4 world = Matrix4x4.TRS(transform.position, light.transform.rotation, new Vector3(scale, scale, scale));
 
-            _material.SetMatrix("_WorldViewProj", viewProj * world);
-            _material.SetMatrix("_WorldView", Camera.current.worldToCameraMatrix * world);
+            material.SetMatrix(VolumetricLightingShaderConstants.WorldViewProj, viewProj * world);
+            material.SetMatrix(VolumetricLightingShaderConstants.WorldView, Camera.current.worldToCameraMatrix * world);
 
-            if (Noise)
-                _material.EnableKeyword("NOISE");
+            if (noise)
+                material.EnableKeyword("NOISE");
             else
-                _material.DisableKeyword("NOISE");
+                material.DisableKeyword("NOISE");
 
-            _material.SetVector("_LightPos", new Vector4(_light.transform.position.x, _light.transform.position.y, _light.transform.position.z, 1.0f / (_light.range * _light.range)));
-            _material.SetColor("_LightColor", _light.color * _light.intensity);
+            material.SetVector(VolumetricLightingShaderConstants.LightPos, new Vector4(light.transform.position.x, light.transform.position.y, light.transform.position.z, 1.0f / (light.range * light.range)));
+            material.SetColor(VolumetricLightingShaderConstants.LightColor, light.color * light.intensity);
 
-            if (_light.cookie == null)
+            if (light.cookie == null)
             {
-                _material.EnableKeyword("POINT");
-                _material.DisableKeyword("POINT_COOKIE");
+                material.EnableKeyword("POINT");
+                material.DisableKeyword("POINT_COOKIE");
             }
             else
             {
-                Matrix4x4 view = Matrix4x4.TRS(_light.transform.position, _light.transform.rotation, Vector3.one).inverse;
-                _material.SetMatrix("_MyLightMatrix0", view);
+                Matrix4x4 view = Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one).inverse;
+                material.SetMatrix(VolumetricLightingShaderConstants.MyLightMatrix0, view);
 
-                _material.EnableKeyword("POINT_COOKIE");
-                _material.DisableKeyword("POINT");
+                material.EnableKeyword("POINT_COOKIE");
+                material.DisableKeyword("POINT");
 
-                _material.SetTexture("_LightTexture0", _light.cookie);
+                material.SetTexture(VolumetricLightingShaderConstants.LightTexture0, light.cookie);
             }
 
-            bool forceShadowsOff = false;
-            if ((_light.transform.position - Camera.current.transform.position).magnitude >= QualitySettings.shadowDistance)
-                forceShadowsOff = true;
+            bool forceShadowsOff = (light.transform.position - Camera.current.transform.position).magnitude >= QualitySettings.shadowDistance;
 
-            if (_light.shadows != LightShadows.None && forceShadowsOff == false)
+            if (light.shadows != LightShadows.None && forceShadowsOff == false)
             {
-                _material.EnableKeyword("SHADOWS_CUBE");
-                _commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
+                material.EnableKeyword("SHADOWS_CUBE");
+                commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
+                commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
 
-                _commandBuffer.DrawMesh(mesh, world, _material, 0, pass);
+                commandBuffer.DrawMesh(mesh, world, material, 0, pass);
 
                 if (CustomRenderEvent != null)
-                    CustomRenderEvent(renderer, this, _commandBuffer, viewProj);
+                    CustomRenderEvent(renderer, this, commandBuffer, viewProj);
             }
             else
             {
-                _material.DisableKeyword("SHADOWS_CUBE");
-                renderer.GlobalCommandBuffer.DrawMesh(mesh, world, _material, 0, pass);
+                material.DisableKeyword("SHADOWS_CUBE");
+                renderer.GlobalCommandBuffer.DrawMesh(mesh, world, material, 0, pass);
 
                 if (CustomRenderEvent != null)
                     CustomRenderEvent(renderer, this, renderer.GlobalCommandBuffer, viewProj);
@@ -292,9 +299,9 @@ namespace VolumetricLights
         /// <param name="viewProj"></param>
         private void SetupSpotLight(VolumetricLightRenderer renderer, Matrix4x4 viewProj)
         {
-            _commandBuffer.Clear();
+            commandBuffer.Clear();
 
-            int pass = 1;
+            var pass = 1;
             if (!IsCameraInSpotLightBounds())
             {
                 pass = 3;
@@ -302,65 +309,60 @@ namespace VolumetricLights
 
             Mesh mesh = VolumetricLightRenderer.GetSpotLightMesh();
 
-            float scale = _light.range;
-            float angleScale = Mathf.Tan((_light.spotAngle + 1) * 0.5f * Mathf.Deg2Rad) * _light.range;
+            float scale = light.range;
+            float angleScale = Mathf.Tan((light.spotAngle + 1) * 0.5f * Mathf.Deg2Rad) * light.range;
 
             Matrix4x4 world = Matrix4x4.TRS(transform.position, transform.rotation, new Vector3(angleScale, angleScale, scale));
 
-            Matrix4x4 view = Matrix4x4.TRS(_light.transform.position, _light.transform.rotation, Vector3.one).inverse;
+            Matrix4x4 view = Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one).inverse;
 
             Matrix4x4 clip = Matrix4x4.TRS(new Vector3(0.5f, 0.5f, 0.0f), Quaternion.identity, new Vector3(-0.5f, -0.5f, 1.0f));
-            Matrix4x4 proj = Matrix4x4.Perspective(_light.spotAngle, 1, 0, 1);
+            Matrix4x4 proj = Matrix4x4.Perspective(light.spotAngle, 1, 0, 1);
 
-            _material.SetMatrix("_MyLightMatrix0", clip * proj * view);
+            material.SetMatrix(VolumetricLightingShaderConstants.MyLightMatrix0, clip * proj * view);
 
-            _material.SetMatrix("_WorldViewProj", viewProj * world);
+            material.SetMatrix(VolumetricLightingShaderConstants.WorldViewProj, viewProj * world);
 
-            _material.SetVector("_LightPos", new Vector4(_light.transform.position.x, _light.transform.position.y, _light.transform.position.z, 1.0f / (_light.range * _light.range)));
-            _material.SetVector("_LightColor", _light.color * _light.intensity);
+            material.SetVector(VolumetricLightingShaderConstants.LightPos, new Vector4(light.transform.position.x, light.transform.position.y, light.transform.position.z, 1.0f / (light.range * light.range)));
+            material.SetVector(VolumetricLightingShaderConstants.LightColor, light.color * light.intensity);
 
 
             Vector3 apex = transform.position;
             Vector3 axis = transform.forward;
             // plane equation ax + by + cz + d = 0; precompute d here to lighten the shader
-            Vector3 center = apex + axis * _light.range;
+            Vector3 center = apex + axis * light.range;
             float d = -Vector3.Dot(center, axis);
 
             // update material
-            _material.SetFloat("_PlaneD", d);
-            _material.SetFloat("_CosAngle", Mathf.Cos((_light.spotAngle + 1) * 0.5f * Mathf.Deg2Rad));
+            material.SetFloat(VolumetricLightingShaderConstants.PlaneD, d);
+            material.SetFloat(VolumetricLightingShaderConstants.CosAngle, Mathf.Cos((light.spotAngle + 1) * 0.5f * Mathf.Deg2Rad));
 
-            _material.SetVector("_ConeApex", new Vector4(apex.x, apex.y, apex.z));
-            _material.SetVector("_ConeAxis", new Vector4(axis.x, axis.y, axis.z));
+            material.SetVector(VolumetricLightingShaderConstants.ConeApex, new Vector4(apex.x, apex.y, apex.z));
+            material.SetVector(VolumetricLightingShaderConstants.ConeAxis, new Vector4(axis.x, axis.y, axis.z));
 
-            _material.EnableKeyword("SPOT");
+            material.EnableKeyword("SPOT");
 
-            if (Noise)
-                _material.EnableKeyword("NOISE");
+            if (noise)
+                material.EnableKeyword("NOISE");
             else
-                _material.DisableKeyword("NOISE");
+                material.DisableKeyword("NOISE");
 
-            if (_light.cookie == null)
+            if (light.cookie == null)
             {
-                _material.SetTexture("_LightTexture0", VolumetricLightRenderer.GetDefaultSpotCookie());
+                material.SetTexture(VolumetricLightingShaderConstants.LightTexture0, VolumetricLightRenderer.Current.GetDefaultSpotCookie());
             }
             else
             {
-                _material.SetTexture("_LightTexture0", _light.cookie);
+                material.SetTexture(VolumetricLightingShaderConstants.LightTexture0, light.cookie);
             }
 
-            bool forceShadowsOff = false;
-            if ((_light.transform.position - Camera.current.transform.position).magnitude >= QualitySettings.shadowDistance)
-                forceShadowsOff = true;
+            bool forceShadowsOff = (light.transform.position - Camera.current.transform.position).magnitude >= QualitySettings.shadowDistance;
 
-            if (_light.shadows != LightShadows.None && forceShadowsOff == false)
+            if (light.shadows != LightShadows.None && forceShadowsOff == false)
             {
                 clip = Matrix4x4.TRS(new Vector3(0.5f, 0.5f, 0.5f), Quaternion.identity, new Vector3(0.5f, 0.5f, 0.5f));
 
-                if (_reversedZ)
-                    proj = Matrix4x4.Perspective(_light.spotAngle, 1, _light.range, _light.shadowNearPlane);
-                else
-                    proj = Matrix4x4.Perspective(_light.spotAngle, 1, _light.shadowNearPlane, _light.range);
+                proj = reversedZ ? Matrix4x4.Perspective(light.spotAngle, 1, light.range, light.shadowNearPlane) : Matrix4x4.Perspective(light.spotAngle, 1, light.shadowNearPlane, light.range);
 
                 Matrix4x4 m = clip * proj;
                 m[0, 2] *= -1;
@@ -369,22 +371,22 @@ namespace VolumetricLights
                 m[3, 2] *= -1;
 
                 //view = _light.transform.worldToLocalMatrix;
-                _material.SetMatrix("_MyWorld2Shadow", m * view);
-                _material.SetMatrix("_WorldView", m * view);
+                material.SetMatrix(VolumetricLightingShaderConstants.MyWorld2Shadow, m * view);
+                material.SetMatrix(VolumetricLightingShaderConstants.WorldView, m * view);
 
-                _material.EnableKeyword("SHADOWS_DEPTH");
-                _commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
+                material.EnableKeyword("SHADOWS_DEPTH");
+                commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
+                commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
 
-                _commandBuffer.DrawMesh(mesh, world, _material, 0, pass);
+                commandBuffer.DrawMesh(mesh, world, material, 0, pass);
 
                 if (CustomRenderEvent != null)
-                    CustomRenderEvent(renderer, this, _commandBuffer, viewProj);
+                    CustomRenderEvent(renderer, this, commandBuffer, viewProj);
             }
             else
             {
-                _material.DisableKeyword("SHADOWS_DEPTH");
-                renderer.GlobalCommandBuffer.DrawMesh(mesh, world, _material, 0, pass);
+                material.DisableKeyword("SHADOWS_DEPTH");
+                renderer.GlobalCommandBuffer.DrawMesh(mesh, world, material, 0, pass);
 
                 if (CustomRenderEvent != null)
                     CustomRenderEvent(renderer, this, renderer.GlobalCommandBuffer, viewProj);
@@ -398,66 +400,59 @@ namespace VolumetricLights
         /// <param name="viewProj"></param>
         private void SetupDirectionalLight(VolumetricLightRenderer renderer, Matrix4x4 viewProj)
         {
-            _commandBuffer.Clear();
+            commandBuffer.Clear();
 
-            int pass = 4;
+            var pass = 4;
 
-            _material.SetPass(pass);
+            material.SetPass(pass);
 
-            if (Noise)
-                _material.EnableKeyword("NOISE");
+            if (noise)
+                material.EnableKeyword("NOISE");
             else
-                _material.DisableKeyword("NOISE");
+                material.DisableKeyword("NOISE");
 
-            _material.SetVector("_LightDir", new Vector4(_light.transform.forward.x, _light.transform.forward.y, _light.transform.forward.z, 1.0f / (_light.range * _light.range)));
-            _material.SetVector("_LightColor", _light.color * _light.intensity);
-            _material.SetFloat("_MaxRayLength", MaxRayLength);
+            material.SetVector(VolumetricLightingShaderConstants.LightDir, new Vector4(light.transform.forward.x, light.transform.forward.y, light.transform.forward.z, 1.0f / (light.range * light.range)));
+            material.SetVector(VolumetricLightingShaderConstants.LightColor, light.color * light.intensity);
+            material.SetFloat(VolumetricLightingShaderConstants.MaxRayLength, maxRayLength);
 
-            if (_light.cookie == null)
+            if (light.cookie == null)
             {
-                _material.EnableKeyword("DIRECTIONAL");
-                _material.DisableKeyword("DIRECTIONAL_COOKIE");
+                material.EnableKeyword("DIRECTIONAL");
+                material.DisableKeyword("DIRECTIONAL_COOKIE");
             }
             else
             {
-                _material.EnableKeyword("DIRECTIONAL_COOKIE");
-                _material.DisableKeyword("DIRECTIONAL");
+                material.EnableKeyword("DIRECTIONAL_COOKIE");
+                material.DisableKeyword("DIRECTIONAL");
 
-                _material.SetTexture("_LightTexture0", _light.cookie);
+                material.SetTexture(VolumetricLightingShaderConstants.LightTexture0, light.cookie);
             }
 
             // setup frustum corners for world position reconstruction
             // bottom left
-            _frustumCorners[0] = Camera.current.ViewportToWorldPoint(new Vector3(0, 0, Camera.current.farClipPlane));
+            frustumCorners[0] = Camera.current.ViewportToWorldPoint(new Vector3(0, 0, Camera.current.farClipPlane));
             // top left
-            _frustumCorners[2] = Camera.current.ViewportToWorldPoint(new Vector3(0, 1, Camera.current.farClipPlane));
+            frustumCorners[2] = Camera.current.ViewportToWorldPoint(new Vector3(0, 1, Camera.current.farClipPlane));
             // top right
-            _frustumCorners[3] = Camera.current.ViewportToWorldPoint(new Vector3(1, 1, Camera.current.farClipPlane));
+            frustumCorners[3] = Camera.current.ViewportToWorldPoint(new Vector3(1, 1, Camera.current.farClipPlane));
             // bottom right
-            _frustumCorners[1] = Camera.current.ViewportToWorldPoint(new Vector3(1, 0, Camera.current.farClipPlane));
+            frustumCorners[1] = Camera.current.ViewportToWorldPoint(new Vector3(1, 0, Camera.current.farClipPlane));
 
-#if UNITY_5_4_OR_NEWER
-            _material.SetVectorArray("_FrustumCorners", _frustumCorners);
-#else
-        _material.SetVector("_FrustumCorners0", _frustumCorners[0]);
-        _material.SetVector("_FrustumCorners1", _frustumCorners[1]);
-        _material.SetVector("_FrustumCorners2", _frustumCorners[2]);
-        _material.SetVector("_FrustumCorners3", _frustumCorners[3]);
-#endif
+            material.SetVectorArray(VolumetricLightingShaderConstants.FrustumCorners, frustumCorners);
 
             Texture nullTexture = null;
-            if (_light.shadows != LightShadows.None)
+            if (light.shadows != LightShadows.None)
             {
-                _material.EnableKeyword("SHADOWS_DEPTH");
-                _commandBuffer.Blit(nullTexture, renderer.GetVolumeLightBuffer(), _material, pass);
+                material.EnableKeyword("SHADOWS_DEPTH");
+                commandBuffer.Blit(nullTexture, renderer.GetVolumeLightBuffer(), material, pass);
 
                 if (CustomRenderEvent != null)
-                    CustomRenderEvent(renderer, this, _commandBuffer, viewProj);
+                    CustomRenderEvent(renderer, this, commandBuffer, viewProj);
             }
             else
             {
-                _material.DisableKeyword("SHADOWS_DEPTH");
-                renderer.GlobalCommandBuffer.Blit(nullTexture, renderer.GetVolumeLightBuffer(), _material, pass);
+                material.DisableKeyword("SHADOWS_DEPTH");
+                renderer.GlobalCommandBuffer.Blit(nullTexture, renderer.GetVolumeLightBuffer(), material, pass);
 
                 if (CustomRenderEvent != null)
                     CustomRenderEvent(renderer, this, renderer.GlobalCommandBuffer, viewProj);
@@ -470,11 +465,9 @@ namespace VolumetricLights
         /// <returns></returns>
         private bool IsCameraInPointLightBounds()
         {
-            float distanceSqr = (_light.transform.position - Camera.current.transform.position).sqrMagnitude;
-            float extendedRange = _light.range + 1;
-            if (distanceSqr < (extendedRange * extendedRange))
-                return true;
-            return false;
+            float distanceSqr = (light.transform.position - Camera.current.transform.position).sqrMagnitude;
+            float extendedRange = light.range + 1;
+            return distanceSqr < (extendedRange * extendedRange);
         }
 
         /// <summary>
@@ -484,17 +477,11 @@ namespace VolumetricLights
         private bool IsCameraInSpotLightBounds()
         {
             // check range
-            float distance = Vector3.Dot(_light.transform.forward, (Camera.current.transform.position - _light.transform.position));
-            float extendedRange = _light.range + 1;
-            if (distance > (extendedRange))
-                return false;
-
-            // check angle
-            float cosAngle = Vector3.Dot(transform.forward, (Camera.current.transform.position - _light.transform.position).normalized);
-            if ((Mathf.Acos(cosAngle) * Mathf.Rad2Deg) > (_light.spotAngle + 3) * 0.5f)
-                return false;
-
-            return true;
+            float distance = Vector3.Dot(light.transform.forward, (Camera.current.transform.position - light.transform.position));
+            float extendedRange = light.range + 1;
+            if (distance > (extendedRange)) return false;
+            float cosAngle = Vector3.Dot(transform.forward, (Camera.current.transform.position - light.transform.position).normalized);
+            return !((Mathf.Acos(cosAngle) * Mathf.Rad2Deg) > (light.spotAngle + 3) * 0.5f);
         }
     }
 }
